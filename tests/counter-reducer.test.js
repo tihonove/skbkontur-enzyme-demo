@@ -1,14 +1,23 @@
 import React from 'react';
 import sinon from 'sinon';
-import { mount } from 'enzyme';
+import { ReactWrapper, mount } from 'enzyme';
 
 import Foo from './Foo';
 import ComponentWithInput from './ComponentWithInput';
 import ComponentWithAsyncActions from './ComponentWithAsyncActions';
+import ComponentWithLink from './ComponentWithLink';
+import ComponentWithRouter, {history} from './ComponentWithRouter';
 
 import jsdom from 'jsdom';
 
 import { InputAdapter } from 'retail-ui/components/Input/Input.adapter.js';
+
+ReactWrapper.prototype.hackedSimulate = function(eventName) {
+    const evt = new window.Event("click", {bubbles: true});
+    //const evt = document.createEvent("MouseEvents");
+    //evt.initMouseEvent(eventName, true, true, window, 0, 0, 0, 80, 20, false, false, false, false, 0, null);
+    this.node.dispatchEvent(evt);
+}
 
 function injectJsDomToGlobal() {
     const document = jsdom.jsdom('<!doctype html><html><body><div id="content"></div></body></html>', {
@@ -57,7 +66,9 @@ function createAsyncMockFunction() {
     const result = async function() {
         return await result.expectations[0].invoke();
     };
+
     result.expectations = [];
+
     result.expect = function (argsArray) {
         const expectation = new Expectation();
         result.expectations.push(expectation);
@@ -71,6 +82,70 @@ function nextTick() {
 }
 
 describe('<ComponentWithAsyncActions />', () => {
+    setUpJsDom();
+
+    ait('', async () => {
+        const api = createMock(['invertValue']);
+        const wrapper = mountIntoContent(<ComponentWithAsyncActions api={api} />);
+
+        const expectation = api.invertValue.expect(['ab']);
+        const uiInput = wrapper.find('Input');
+        InputAdapter.setValue(uiInput.node, 'ab');
+        expect(InputAdapter.getValue(uiInput.node)).toBe('ab');
+        expect(wrapper.find('.invertedValue').text()).toBe('');
+        await expectation.resolve('ba');
+        expect(wrapper.find('.invertedValue').text()).toBe('ba');
+    });
+});
+
+describe('<ComponentWithLink />', () => {
+    setUpJsDom();
+
+    ait('', async () => {
+        const wrapper = mountIntoContent(<ComponentWithLink />);
+
+        document.body.addEventListener('click', function(e) {
+            console.log(e.target.href);
+            console.log('defaultPrevented', e.defaultPrevented);
+            console.log('body test');
+        });
+
+        //wrapper.find('.zzzz').simulate('click');
+        wrapper.find('a').hackedSimulate('click');
+    });
+});
+
+describe('<ComponentWithRouter />', () => {
+    setUpJsDom();
+
+    ait('', async () => {
+        console.log('-===========================')
+
+        const wrapper = mountIntoContent(<ComponentWithRouter />);
+        //console.log(wrapper.options.attachTo)
+        wrapper.options.attachTo.addEventListener('click', function(e) {
+            console.log('InBody')
+            if (e.target.href) {
+                //e.preventDefault();
+                history.push(e.target.href.replace('http://localhost', ''));
+            }
+
+        }, true);
+
+        expect(wrapper.find('.content').text()).toBe('B');
+        wrapper.find('a.router-link').hackedSimulate('click');
+        //wrapper.find('Link').simulate('click', { button: 0 });
+        //wrapper.find('Button button').hackedSimulate('click');
+        //wrapper.find('button.native-button').simulate('click');
+        //wrapper.find('button.native-button').hackedSimulate('click');
+        //wrapper.find('a.native-link').hackedSimulate('click');
+        expect(wrapper.find('.content').text()).toBe('A');
+
+        console.log('-===========================')
+    });
+});
+
+describe('<ComponentWithLink />', () => {
     setUpJsDom();
 
     ait('', async () => {
