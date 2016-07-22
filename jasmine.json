@@ -4,7 +4,7 @@
     "**/*.test.js"
   ],
   "helpers": [
-    "../node_modules/babel-core/register.js"
+    "./helpers/patched-babel-register.js"
   ],
   "stopSpecOnExpectationFailure": false,
   "random": false
