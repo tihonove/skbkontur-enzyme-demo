@@ -4,6 +4,7 @@ import { mount } from 'enzyme';
 
 import Foo from './Foo';
 import ComponentWithInput from './ComponentWithInput';
+import ComponentWithAsyncActions from './ComponentWithAsyncActions';
 
 import jsdom from 'jsdom';
 
@@ -30,6 +31,61 @@ function setUpJsDom() {
 function mountIntoContent(node, options) {
     return mount(node, { attachTo: document.getElementById('content'), ...options });
 }
+
+function createMock(functions) {
+    return functions
+        .map(functionName => ({ [functionName]: createAsyncMockFunction() }))
+        .reduce((x, y) => ({ ...x, ...y }));
+}
+
+class Expectation {
+    constructor() {
+        this.promise = new Promise(r => this.promiseResolve = r);
+    }
+
+    async resolve(result) {
+        this.promiseResolve(result);
+        await nextTick();
+    }
+
+    invoke() {
+        return this.promise;
+    }
+}
+
+function createAsyncMockFunction() {
+    const result = async function() {
+        return await result.expectations[0].invoke();
+    };
+    result.expectations = [];
+    result.expect = function (argsArray) {
+        const expectation = new Expectation();
+        result.expectations.push(expectation);
+        return expectation;
+    };
+    return result;
+}
+
+function nextTick() {
+    return new Promise(r => setTimeout(r, 0));
+}
+
+describe('<ComponentWithAsyncActions />', () => {
+    setUpJsDom();
+
+    ait('', async () => {
+        const api = createMock(['invertValue']);
+        const wrapper = mountIntoContent(<ComponentWithAsyncActions api={api} />);
+
+        const expectation = api.invertValue.expect(['ab']);
+        const uiInput = wrapper.find('Input');
+        InputAdapter.setValue(uiInput.node, 'ab');
+        expect(InputAdapter.getValue(uiInput.node)).toBe('ab');
+        expect(wrapper.find('.invertedValue').text()).toBe('');
+        await expectation.resolve('ba');
+        expect(wrapper.find('.invertedValue').text()).toBe('ba');
+    });
+});
 
 describe('<ComponentWithInput />', () => {
     setUpJsDom();
@@ -71,7 +127,7 @@ describe('<Foo />', () => {
 });
 
 // TODO:
-// 1. Переочитска дома на каждый тест
+// + Переочитска дома на каждый тест
 // асинхронные компоненты
 // реакт роутер
 // проверить как всё это барахло работает с редаксом
